@@ -1,0 +1,503 @@
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-sans); }
+.map-wrap { padding: 1rem 0; }
+
+@keyframes flowPulse {
+  0%   { stroke-dashoffset: 24; opacity: 0.5; }
+  100% { stroke-dashoffset: 0; opacity: 0.9; }
+}
+@keyframes nodeAppear {
+  from { opacity: 0; transform: scale(0.93); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes highlightPulse {
+  0%,100% { filter: drop-shadow(0 0 4px rgba(83,74,183,0.0)); }
+  50%      { filter: drop-shadow(0 0 8px rgba(83,74,183,0.5)); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .flow-line { animation: flowPulse 1.1s ease forwards; }
+  .flow-node { animation: nodeAppear 0.45s ease forwards; }
+  .scenario-highlight { animation: highlightPulse 1.8s ease-in-out 3; }
+}
+.flow-line { stroke-dasharray: 8 0; }
+.flow-node-1 { animation-delay:0.1s; opacity:0; }
+.flow-node-2 { animation-delay:0.3s; opacity:0; }
+.flow-node-3 { animation-delay:0.5s; opacity:0; }
+.flow-node-4 { animation-delay:0.7s; opacity:0; }
+.flow-node-5 { animation-delay:0.9s; opacity:0; }
+.fl1{animation-delay:0.2s;} .fl2{animation-delay:0.4s;} .fl3{animation-delay:0.6s;} .fl4{animation-delay:0.8s;}
+
+.map-el { transition: opacity 0.35s, filter 0.35s; }
+.map-el.dimmed  { opacity: 0.13; pointer-events: none; }
+.map-el.lit     { opacity: 1; }
+.map-el.ctx-default { opacity: 0.42; }
+.map-el.ctx-default:hover { opacity: 1; }
+
+/* Scenario bar */
+.scenario-bar { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; }
+.sc-btn { font-size:12px; padding:7px 13px; border-radius: var(--border-radius-md); border:0.5px solid var(--color-border-secondary); background:var(--color-background-secondary); color:var(--color-text-secondary); cursor:pointer; transition:all 0.15s; line-height:1.3; text-align:left; }
+.sc-btn:hover { border-color:var(--color-border-primary); color:var(--color-text-primary); background:var(--color-background-primary); }
+.sc-btn.active { background:var(--color-text-primary); color:var(--color-background-primary); border-color:var(--color-text-primary); }
+.sc-btn .sc-label { font-weight:500; display:block; }
+.sc-btn .sc-sub { font-size:10px; opacity:0.7; display:block; margin-top:1px; }
+.sc-reset { font-size:11px; padding:5px 10px; border-radius:var(--border-radius-md); border:0.5px solid var(--color-border-tertiary); background:transparent; color:var(--color-text-secondary); cursor:pointer; align-self:center; }
+.sc-reset:hover { color:var(--color-text-primary); }
+
+/* Scenario explanation box */
+.scenario-explanation {
+  display:none; margin-bottom:14px;
+  background:var(--color-background-secondary);
+  border-radius:var(--border-radius-lg);
+  border:0.5px solid var(--color-border-secondary);
+  padding:14px 16px;
+  animation: fadeIn 0.2s ease;
+}
+.scenario-explanation.visible { display:block; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(3px);}to{opacity:1;transform:translateY(0);} }
+.sc-exp-title { font-size:13px; font-weight:500; color:var(--color-text-primary); margin-bottom:6px; }
+.sc-exp-body { font-size:13px; color:var(--color-text-secondary); line-height:1.7; }
+.sc-exp-chain { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; align-items:center; }
+.sc-chain-item { font-size:11px; padding:3px 9px; border-radius:10px; font-weight:500; }
+.chain-red   { background:#FCEBEB; color:#A32D2D; }
+.chain-amber { background:#FAEEDA; color:#633806; }
+.chain-purple{ background:#EEEDFE; color:#3C3489; }
+.chain-teal  { background:#E1F5EE; color:#085041; }
+.chain-arrow { font-size:12px; color:var(--color-text-secondary); }
+
+/* Detail panel */
+.panel-overlay { display:none; margin-top:14px; background:var(--color-background-primary); border:0.5px solid var(--color-border-secondary); border-radius:var(--border-radius-lg); padding:16px 18px; animation:fadeIn 0.15s ease; }
+.panel-overlay.visible { display:block; }
+.panel-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:10px; }
+.panel-title { font-size:15px; font-weight:500; color:var(--color-text-primary); }
+.panel-close { font-size:18px; color:var(--color-text-secondary); cursor:pointer; line-height:1; padding:0 4px; }
+.panel-close:hover { color:var(--color-text-primary); }
+.panel-body { font-size:13px; color:var(--color-text-secondary); line-height:1.75; margin-bottom:12px; }
+.panel-q { font-size:13px; color:var(--color-text-primary); background:var(--color-background-warning); border-left:2px solid #BA7517; padding:8px 12px; border-radius:0 var(--border-radius-md) var(--border-radius-md) 0; font-style:italic; margin-bottom:10px; }
+.panel-q::before { content:"Помисли: "; font-style:normal; font-weight:500; }
+.panel-teacher-action { font-size:13px; color:var(--color-text-primary); background:var(--color-background-info); border-left:2px solid var(--color-border-info); padding:8px 12px; border-radius:0 var(--border-radius-md) var(--border-radius-md) 0; margin-bottom:10px; }
+.panel-teacher-action::before { content:"Какво може да направи учителят: "; font-weight:500; }
+.panel-tag { display:inline-block; font-size:11px; padding:2px 8px; border-radius:10px; margin-right:4px; margin-top:4px; }
+.tag-context{background:#E1F5EE;color:#085041;} .tag-mech{background:#EEEDFE;color:#3C3489;} .tag-teacher{background:#FAECE7;color:#712B13;} .tag-knowledge{background:#FAEEDA;color:#633806;}
+
+.principles-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(210px, 1fr)); gap:8px; margin-top:16px; }
+.principle-card { background:var(--color-background-secondary); border-radius:var(--border-radius-md); padding:12px 14px; cursor:pointer; border:0.5px solid transparent; transition:all 0.15s; }
+.principle-card:hover { border-color:var(--color-border-secondary); background:var(--color-background-primary); }
+.principle-text { font-size:13px; font-weight:500; color:var(--color-text-primary); margin-bottom:3px; line-height:1.4; }
+.principle-source { font-size:11px; color:var(--color-text-secondary); }
+.principle-expand { display:none; font-size:12px; color:var(--color-text-secondary); line-height:1.65; margin-top:8px; border-top:0.5px solid var(--color-border-tertiary); padding-top:8px; }
+.principle-expand.open { display:block; }
+.section-label { font-size:11px; color:var(--color-text-secondary); text-transform:uppercase; letter-spacing:0.06em; font-weight:500; margin-bottom:8px; margin-top:20px; }
+</style>
+
+<div class="map-wrap">
+
+<!-- SCENARIO BAR -->
+<div class="scenario-bar" id="scenario-bar">
+  <div style="font-size:11px;color:var(--color-text-secondary);align-self:center;white-space:nowrap;font-weight:500;letter-spacing:0.05em;text-transform:uppercase;">Сценарий:</div>
+  <button class="sc-btn" onclick="applyScenario('passive')"><span class="sc-label">Учениците мълчат</span><span class="sc-sub">активност без мислене</span></button>
+  <button class="sc-btn" onclick="applyScenario('forgot')"><span class="sc-label">Научиха, после забравиха</span><span class="sc-sub">следващия час — нищо</span></button>
+  <button class="sc-btn" onclick="applyScenario('afraid')"><span class="sc-label">Ученик не участва</span><span class="sc-sub">може, но не опитва</span></button>
+  <button class="sc-btn" onclick="applyScenario('overload')"><span class="sc-label">Объркани след обяснението</span><span class="sc-sub">претоварване</span></button>
+  <button class="sc-btn" onclick="applyScenario('transfer')"><span class="sc-label">Знаят, но не прилагат</span><span class="sc-sub">трансферът не работи</span></button>
+  <button class="sc-reset" id="sc-reset" onclick="resetScenario()" style="display:none">× Изчисти</button>
+</div>
+
+<!-- SCENARIO EXPLANATION -->
+<div class="scenario-explanation" id="sc-explanation">
+  <div class="sc-exp-title" id="sc-exp-title"></div>
+  <div class="sc-exp-body" id="sc-exp-body"></div>
+  <div class="sc-exp-chain" id="sc-exp-chain"></div>
+</div>
+
+<svg id="map-svg" width="100%" viewBox="0 0 680 630">
+<defs>
+  <marker id="arr-flow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+    <path d="M2 1L8 5L2 9" fill="none" stroke="#534AB7" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+  </marker>
+  <marker id="arr-ctx" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+    <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </marker>
+  <marker id="arr-forget" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+    <path d="M2 1L8 5L2 9" fill="none" stroke="#E24B4A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </marker>
+  <marker id="arr-ltm" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+    <path d="M2 1L8 5L2 9" fill="none" stroke="#3C3489" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </marker>
+  <filter id="glow"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  <filter id="glow-red"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+</defs>
+
+<!-- OUTER: ВЪНШНА СРЕДА -->
+<rect x="18" y="18" width="644" height="594" rx="22" fill="none" stroke="#D3D1C7" stroke-width="0.5" stroke-dasharray="5 3"/>
+<text x="34" y="37" font-size="10" fill="#B4B2A9" font-family="var(--font-sans)" font-weight="500" letter-spacing="0.08em">ВЪНШНА СРЕДА</text>
+
+<g id="el-env-space" class="map-el ctx-default" onclick="handleClick(this,'env-space')" style="cursor:pointer">
+  <rect x="28" y="44" width="108" height="42" rx="9" fill="#F1EFE8" stroke="#D3D1C7" stroke-width="0.5"/>
+  <text x="82" y="61" text-anchor="middle" dominant-baseline="central" font-size="11" font-weight="500" fill="#5F5E5A" font-family="var(--font-sans)">Физическа среда</text>
+  <text x="82" y="76" text-anchor="middle" dominant-baseline="central" font-size="10" fill="#888780" font-family="var(--font-sans)">шум · светлина · ред</text>
+</g>
+<g id="el-env-social" class="map-el ctx-default" onclick="handleClick(this,'env-social')" style="cursor:pointer">
+  <rect x="148" y="44" width="108" height="42" rx="9" fill="#F1EFE8" stroke="#D3D1C7" stroke-width="0.5"/>
+  <text x="202" y="61" text-anchor="middle" dominant-baseline="central" font-size="11" font-weight="500" fill="#5F5E5A" font-family="var(--font-sans)">Социална среда</text>
+  <text x="202" y="76" text-anchor="middle" dominant-baseline="central" font-size="10" fill="#888780" font-family="var(--font-sans)">принадлежност · норми</text>
+</g>
+<g id="el-env-task" class="map-el ctx-default" onclick="handleClick(this,'env-task')" style="cursor:pointer">
+  <rect x="268" y="44" width="108" height="42" rx="9" fill="#FEF6E8" stroke="#EF9F27" stroke-width="0.8"/>
+  <text x="322" y="61" text-anchor="middle" dominant-baseline="central" font-size="11" font-weight="500" fill="#633806" font-family="var(--font-sans)">Задачата</text>
+  <text x="322" y="76" text-anchor="middle" dominant-baseline="central" font-size="10" fill="#BA7517" font-family="var(--font-sans)">вид знание · трудност</text>
+</g>
+<g id="el-teacher" class="map-el ctx-default" onclick="handleClick(this,'teacher-node')" style="cursor:pointer">
+  <rect x="388" y="44" width="108" height="42" rx="9" fill="#FDF0EB" stroke="#D85A30" stroke-width="0.8"/>
+  <text x="442" y="61" text-anchor="middle" dominant-baseline="central" font-size="11" font-weight="500" fill="#712B13" font-family="var(--font-sans)">Учителят</text>
+  <text x="442" y="76" text-anchor="middle" dominant-baseline="central" font-size="10" fill="#993C1D" font-family="var(--font-sans)">дизайн · въпроси · ОВ</text>
+</g>
+<g id="el-env-family" class="map-el ctx-default" onclick="handleClick(this,'env-family')" style="cursor:pointer">
+  <rect x="508" y="44" width="108" height="42" rx="9" fill="#F1EFE8" stroke="#D3D1C7" stroke-width="0.5"/>
+  <text x="562" y="61" text-anchor="middle" dominant-baseline="central" font-size="11" font-weight="500" fill="#5F5E5A" font-family="var(--font-sans)">Семейство</text>
+  <text x="562" y="76" text-anchor="middle" dominant-baseline="central" font-size="10" fill="#888780" font-family="var(--font-sans)">опит · очаквания</text>
+</g>
+
+<!-- Task arrow -->
+<line id="el-task-arrow" class="map-el ctx-default" x1="322" y1="86" x2="322" y2="170" stroke="#D4A84B" stroke-width="0.8" stroke-dasharray="3 2" marker-end="url(#arr-ctx)"/>
+<!-- Teacher arrow -->
+<path id="el-teacher-arrow" class="map-el ctx-default" d="M442 86 Q442 148 378 202" fill="none" stroke="#D85A30" stroke-width="0.8" stroke-dasharray="3 2" marker-end="url(#arr-ctx)"/>
+
+<!-- INNER: ВЪТРЕШЕН КОНТЕКСТ -->
+<rect x="42" y="106" width="596" height="400" rx="16" fill="none" stroke="#C0E8D8" stroke-width="0.5" stroke-dasharray="3 3"/>
+<text x="58" y="122" font-size="10" fill="#5DCAA5" font-family="var(--font-sans)" font-weight="500" letter-spacing="0.08em">ВЪТРЕШЕН КОНТЕКСТ</text>
+
+<g id="el-inner-safe" class="map-el ctx-default" onclick="handleClick(this,'inner-safe')" style="cursor:pointer">
+  <rect x="52" y="130" width="112" height="42" rx="9" fill="#EDF9F4" stroke="#9FE1CB" stroke-width="0.5"/>
+  <text x="108" y="147" text-anchor="middle" dominant-baseline="central" font-size="11" font-weight="500" fill="#0F6E56" font-family="var(--font-sans)">Безопасност</text>
+  <text x="108" y="162" text-anchor="middle" dominant-baseline="central" font-size="10" fill="#1D9E75" font-family="var(--font-sans)">притеснен / спокоен</text>
+</g>
+<g id="el-inner-efficacy" class="map-el ctx-default" onclick="handleClick(this,'inner-efficacy')" style="cursor:pointer">
+  <rect x="52" y="186" width="112" height="42" rx="9" fill="#EDF9F4" stroke="#9FE1CB" stroke-width="0.5"/>
+  <text x="108" y="203" text-anchor="middle" dominant-baseline="central" font-size="11" font-weight="500" fill="#0F6E56" font-family="var(--font-sans)">Самоефикасност</text>
+  <text x="108" y="218" text-anchor="middle" dominant-baseline="central" font-size="10" fill="#1D9E75" font-family="var(--font-sans)">вярва / не вярва</text>
+</g>
+<g id="el-inner-prior" class="map-el ctx-default" onclick="handleClick(this,'inner-prior')" style="cursor:pointer">
+  <rect x="52" y="242" width="112" height="42" rx="9" fill="#EDF9F4" stroke="#9FE1CB" stroke-width="0.5"/>
+  <text x="108" y="259" text-anchor="middle" dominant-baseline="central" font-size="11" font-weight="500" fill="#0F6E56" font-family="var(--font-sans)">Предишни знания</text>
+  <text x="108" y="274" text-anchor="middle" dominant-baseline="central" font-size="10" fill="#1D9E75" font-family="var(--font-sans)">схеми / пропуски</text>
+</g>
+<g id="el-inner-state" class="map-el ctx-default" onclick="handleClick(this,'inner-state')" style="cursor:pointer">
+  <rect x="52" y="298" width="112" height="42" rx="9" fill="#EDF9F4" stroke="#9FE1CB" stroke-width="0.5"/>
+  <text x="108" y="315" text-anchor="middle" dominant-baseline="central" font-size="11" font-weight="500" fill="#0F6E56" font-family="var(--font-sans)">Физическо</text>
+  <text x="108" y="330" text-anchor="middle" dominant-baseline="central" font-size="10" fill="#1D9E75" font-family="var(--font-sans)">уморен / отпочинал</text>
+</g>
+<g id="el-inner-motivation" class="map-el ctx-default" onclick="handleClick(this,'inner-motivation')" style="cursor:pointer">
+  <rect x="52" y="354" width="112" height="42" rx="9" fill="#EDF9F4" stroke="#9FE1CB" stroke-width="0.5"/>
+  <text x="108" y="371" text-anchor="middle" dominant-baseline="central" font-size="11" font-weight="500" fill="#0F6E56" font-family="var(--font-sans)">Смисъл</text>
+  <text x="108" y="386" text-anchor="middle" dominant-baseline="central" font-size="10" fill="#1D9E75" font-family="var(--font-sans)">защо си струва / не</text>
+</g>
+
+<!-- Context arrows -->
+<line id="el-ctx-arr1" class="map-el ctx-default" x1="164" y1="151" x2="284" y2="216" stroke="#9FE1CB" stroke-width="0.6" stroke-dasharray="2 2" marker-end="url(#arr-ctx)"/>
+<line id="el-ctx-arr2" class="map-el ctx-default" x1="164" y1="207" x2="284" y2="226" stroke="#9FE1CB" stroke-width="0.6" stroke-dasharray="2 2" marker-end="url(#arr-ctx)"/>
+<line id="el-ctx-arr3" class="map-el ctx-default" x1="164" y1="263" x2="284" y2="234" stroke="#9FE1CB" stroke-width="0.6" stroke-dasharray="2 2" marker-end="url(#arr-ctx)"/>
+<line id="el-ctx-arr4" class="map-el ctx-default" x1="164" y1="319" x2="284" y2="241" stroke="#9FE1CB" stroke-width="0.6" stroke-dasharray="2 2" marker-end="url(#arr-ctx)"/>
+<line id="el-ctx-arr5" class="map-el ctx-default" x1="164" y1="375" x2="284" y2="248" stroke="#9FE1CB" stroke-width="0.6" stroke-dasharray="2 2" marker-end="url(#arr-ctx)"/>
+
+<!-- STUDENT -->
+<g id="el-student" class="map-el flow-node flow-node-1" onclick="handleClick(this,'student-center')" style="cursor:pointer">
+  <circle cx="322" cy="230" r="40" fill="#EEEDFE" stroke="#7F77DD" stroke-width="2"/>
+  <circle cx="322" cy="212" r="14" fill="#AFA9EC" stroke="#7F77DD" stroke-width="1.2"/>
+  <path d="M292 252 Q293 238 322 236 Q351 238 352 252" fill="#EEEDFE" stroke="#7F77DD" stroke-width="1.2" stroke-linejoin="round"/>
+  <circle cx="317" cy="211" r="2" fill="#26215C"/>
+  <circle cx="327" cy="211" r="2" fill="#26215C"/>
+  <path d="M317 218 Q322 222 327 218" fill="none" stroke="#26215C" stroke-width="1.3" stroke-linecap="round"/>
+  <text x="322" y="276" text-anchor="middle" dominant-baseline="central" font-size="12" font-weight="500" fill="#26215C" font-family="var(--font-sans)">Ученикът</text>
+  <text x="322" y="291" text-anchor="middle" dominant-baseline="central" font-size="10" fill="#7F77DD" font-family="var(--font-sans)">изправен пред задача</text>
+</g>
+
+<!-- Student -> Attention -->
+<line id="el-arr-sa" class="map-el flow-line fl1" x1="360" y1="220" x2="428" y2="190" stroke="#534AB7" stroke-width="2.5" marker-end="url(#arr-flow)" filter="url(#glow)"/>
+
+<!-- Attention -->
+<g id="el-attention" class="map-el flow-node flow-node-2" onclick="handleClick(this,'cog-attention')" style="cursor:pointer">
+  <rect x="430" y="158" width="124" height="50" rx="10" fill="#EEEDFE" stroke="#534AB7" stroke-width="2"/>
+  <text x="492" y="178" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="500" fill="#26215C" font-family="var(--font-sans)">Внимание</text>
+  <text x="492" y="195" text-anchor="middle" dominant-baseline="central" font-size="10" fill="#534AB7" font-family="var(--font-sans)">филтър · входна точка</text>
+</g>
+
+<!-- Attention -> WM -->
+<line id="el-arr-aw" class="map-el flow-line fl2" x1="554" y1="183" x2="582" y2="244" stroke="#534AB7" stroke-width="2.5" marker-end="url(#arr-flow)" filter="url(#glow)"/>
+
+<!-- Working Memory -->
+<g id="el-wm" class="map-el flow-node flow-node-3" onclick="handleClick(this,'cog-wm')" style="cursor:pointer">
+  <rect x="518" y="248" width="136" height="54" rx="10" fill="#EEEDFE" stroke="#3C3489" stroke-width="2.5"/>
+  <text x="586" y="268" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="500" fill="#26215C" font-family="var(--font-sans)">Работна памет</text>
+  <text x="586" y="285" text-anchor="middle" dominant-baseline="central" font-size="10" fill="#3C3489" font-family="var(--font-sans)">4–7 елемента · товар</text>
+</g>
+
+<!-- WM -> LTM -->
+<line id="el-arr-wl" class="map-el flow-line fl3" x1="548" y1="302" x2="510" y2="354" stroke="#3C3489" stroke-width="2.5" marker-end="url(#arr-flow)" filter="url(#glow)"/>
+
+<!-- LTM back to WM -->
+<path id="el-ltm-back" class="map-el ctx-default" d="M574 354 Q618 318 586 302" fill="none" stroke="#3C3489" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#arr-ltm)"/>
+<text id="el-ltm-back-label" class="map-el ctx-default" x="630" y="324" text-anchor="middle" font-size="9" fill="#3C3489" font-family="var(--font-sans)">схемите</text>
+<text id="el-ltm-back-label2" class="map-el ctx-default" x="630" y="335" text-anchor="middle" font-size="9" fill="#3C3489" font-family="var(--font-sans)">освобождават</text>
+
+<!-- Long-term Memory -->
+<g id="el-ltm" class="map-el flow-node flow-node-4" onclick="handleClick(this,'cog-ltm')" style="cursor:pointer">
+  <rect x="440" y="356" width="136" height="54" rx="10" fill="#EEEDFE" stroke="#26215C" stroke-width="2.5"/>
+  <text x="508" y="376" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="500" fill="#26215C" font-family="var(--font-sans)">Дългосрочна памет</text>
+  <text x="508" y="393" text-anchor="middle" dominant-baseline="central" font-size="10" fill="#3C3489" font-family="var(--font-sans)">схеми · трайна промяна</text>
+</g>
+
+<!-- LTM -> Practice -->
+<line id="el-arr-lp" class="map-el flow-line fl4" x1="440" y1="392" x2="400" y2="418" stroke="#26215C" stroke-width="2" marker-end="url(#arr-flow)" filter="url(#glow)"/>
+
+<!-- Practice -->
+<g id="el-practice" class="map-el flow-node flow-node-5" onclick="handleClick(this,'cog-practice')" style="cursor:pointer">
+  <rect x="216" y="414" width="178" height="50" rx="10" fill="#FAEEDA" stroke="#BA7517" stroke-width="2"/>
+  <text x="305" y="434" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="500" fill="#412402" font-family="var(--font-sans)">Упражняване</text>
+  <text x="305" y="451" text-anchor="middle" dominant-baseline="central" font-size="10" fill="#854F0B" font-family="var(--font-sans)">retrieval · spacing · редуване</text>
+</g>
+
+<!-- Forgetting -->
+<g id="el-forgetting" class="map-el ctx-default" onclick="handleClick(this,'cog-forgetting')" style="cursor:pointer">
+  <rect x="216" y="476" width="178" height="40" rx="9" fill="#FCEBEB" stroke="#E24B4A" stroke-width="0.8"/>
+  <text x="305" y="493" text-anchor="middle" dominant-baseline="central" font-size="12" font-weight="500" fill="#501313" font-family="var(--font-sans)">Забравяне</text>
+  <text x="305" y="508" text-anchor="middle" dominant-baseline="central" font-size="10" fill="#A32D2D" font-family="var(--font-sans)">механизъм, не провал</text>
+</g>
+
+<!-- Forgetting loop -->
+<path id="el-forget-loop" class="map-el ctx-default" d="M216 496 Q176 496 176 438 Q176 392 216 428" fill="none" stroke="#E24B4A" stroke-width="1" stroke-dasharray="3 2" marker-end="url(#arr-forget)"/>
+<text id="el-forget-label" class="map-el ctx-default" x="160" y="442" text-anchor="middle" font-size="9" fill="#A32D2D" font-family="var(--font-sans)">↻ затова</text>
+<text id="el-forget-label2" class="map-el ctx-default" x="160" y="453" text-anchor="middle" font-size="9" fill="#A32D2D" font-family="var(--font-sans)">практиката</text>
+
+<!-- Flow label -->
+<text x="468" y="144" text-anchor="middle" font-size="10" fill="#534AB7" font-family="var(--font-sans)" font-weight="500" letter-spacing="0.06em" opacity="0.65">КОГНИТИВЕН ПОТОК</text>
+<line x1="432" y1="149" x2="554" y2="149" stroke="#534AB7" stroke-width="0.5" opacity="0.25"/>
+
+<!-- Legend -->
+<rect x="28" y="530" width="624" height="52" rx="12" fill="none" stroke="#D3D1C7" stroke-width="0.5"/>
+<rect x="44" y="548" width="9" height="9" rx="2" fill="#EEEDFE" stroke="#534AB7" stroke-width="1.5"/>
+<text x="59" y="557" font-size="11" fill="#444441" font-family="var(--font-sans)" dominant-baseline="central">Когнитивен поток</text>
+<rect x="178" y="548" width="9" height="9" rx="2" fill="#EDF9F4" stroke="#9FE1CB" stroke-width="0.5"/>
+<text x="193" y="557" font-size="11" fill="#888780" font-family="var(--font-sans)" dominant-baseline="central">Вътрешен контекст</text>
+<rect x="342" y="548" width="9" height="9" rx="2" fill="#FDF0EB" stroke="#D85A30" stroke-width="0.8"/>
+<text x="357" y="557" font-size="11" fill="#888780" font-family="var(--font-sans)" dominant-baseline="central">Учителят</text>
+<rect x="432" y="548" width="9" height="9" rx="2" fill="#F1EFE8" stroke="#D3D1C7" stroke-width="0.5"/>
+<text x="447" y="557" font-size="11" fill="#888780" font-family="var(--font-sans)" dominant-baseline="central">Външна среда</text>
+<text x="44" y="572" font-size="10" fill="#B4B2A9" font-family="var(--font-sans)">Избери сценарий за диагностика · кликни върху елемент за обяснение</text>
+</svg>
+
+<div id="detail-panel" class="panel-overlay">
+  <div class="panel-header">
+    <div class="panel-title" id="panel-title"></div>
+    <div class="panel-close" onclick="closePanel()">✕</div>
+  </div>
+  <div class="panel-body" id="panel-body"></div>
+  <div class="panel-teacher-action" id="panel-action" style="display:none"></div>
+  <div class="panel-q" id="panel-q" style="display:none"></div>
+  <div id="panel-tags"></div>
+</div>
+
+<div class="section-label">Водещи принципи</div>
+<div class="principles-grid" id="principles-grid"></div>
+
+<script>
+const scenarios = {
+  passive: {
+    title: 'Учениците мълчат — активност без мислене',
+    body: 'Учениците изглеждат заети, участват в дейността, но в края на часа не са научили почти нищо. Проблемът обикновено не е в мотивацията — а в това, че дейността не е изисквала реално мислене. Вниманието е било "включено", но насочено към нерелевантното.',
+    chain: [
+      {label:'Задачата', cls:'chain-amber'},
+      {label:'→', cls:'chain-arrow'},
+      {label:'Внимание (грешно насочено)', cls:'chain-purple'},
+      {label:'→', cls:'chain-arrow'},
+      {label:'Работна памет (не се натоварва правилно)', cls:'chain-purple'},
+      {label:'→', cls:'chain-arrow'},
+      {label:'Без трайна промяна', cls:'chain-red'},
+    ],
+    lit: ['el-env-task','el-task-arrow','el-attention','el-arr-sa','el-wm','el-arr-aw','el-student'],
+    dim: ['el-inner-safe','el-inner-efficacy','el-inner-state','el-inner-motivation','el-env-space','el-env-social','el-env-family','el-ltm','el-arr-wl','el-practice','el-forgetting','el-forget-loop','el-forget-label','el-forget-label2','el-arr-lp','el-ltm-back','el-ltm-back-label','el-ltm-back-label2','el-ctx-arr1','el-ctx-arr2','el-ctx-arr3','el-ctx-arr4','el-ctx-arr5','el-teacher','el-teacher-arrow','el-inner-prior']
+  },
+  forgot: {
+    title: 'Научиха в часа — следващия час нищо',
+    body: 'Учениците са разбрали материала по време на урока. Но следващия час — като новобити. Проблемът не е в разбирането, а в липсата на упражняване и забравянето като механизъм. Без retrieval practice и spacing, паметта се разпада по кривата на Ебингхаус.',
+    chain: [
+      {label:'Работна памет (разбрано)', cls:'chain-purple'},
+      {label:'→', cls:'chain-arrow'},
+      {label:'Дългосрочна памет (слаба следа)', cls:'chain-purple'},
+      {label:'→', cls:'chain-arrow'},
+      {label:'Забравяне (без практика)', cls:'chain-red'},
+      {label:'→', cls:'chain-arrow'},
+      {label:'Без упражняване', cls:'chain-amber'},
+    ],
+    lit: ['el-wm','el-arr-wl','el-ltm','el-arr-lp','el-practice','el-forgetting','el-forget-loop','el-forget-label','el-forget-label2','el-ltm-back','el-ltm-back-label','el-ltm-back-label2','el-teacher'],
+    dim: ['el-env-space','el-env-social','el-env-task','el-env-family','el-task-arrow','el-teacher-arrow','el-inner-safe','el-inner-efficacy','el-inner-prior','el-inner-state','el-inner-motivation','el-ctx-arr1','el-ctx-arr2','el-ctx-arr3','el-ctx-arr4','el-ctx-arr5','el-attention','el-arr-sa','el-arr-aw']
+  },
+  afraid: {
+    title: 'Ученик не участва — може, но не опитва',
+    body: 'Ученикът има необходимите знания и умения, но не вдига ръка, не отговаря, избягва предизвикателства. Причината почти никога не е мързел — обикновено е комбинация от ниска самоефикасност и липса на психологическа безопасност. Амигдалата е активирана и блокира достъпа до префронталния кортекс.',
+    chain: [
+      {label:'Ниска безопасност', cls:'chain-red'},
+      {label:'+', cls:'chain-arrow'},
+      {label:'Ниска самоефикасност', cls:'chain-red'},
+      {label:'→', cls:'chain-arrow'},
+      {label:'Внимание (към оцеляване)', cls:'chain-purple'},
+      {label:'→', cls:'chain-arrow'},
+      {label:'Работна памет блокирана', cls:'chain-red'},
+    ],
+    lit: ['el-inner-safe','el-inner-efficacy','el-ctx-arr1','el-ctx-arr2','el-student','el-attention','el-arr-sa','el-wm','el-arr-aw','el-teacher'],
+    dim: ['el-env-space','el-env-social','el-env-task','el-env-family','el-task-arrow','el-teacher-arrow','el-inner-prior','el-inner-state','el-inner-motivation','el-ctx-arr3','el-ctx-arr4','el-ctx-arr5','el-ltm','el-arr-wl','el-practice','el-forgetting','el-forget-loop','el-forget-label','el-forget-label2','el-arr-lp','el-ltm-back','el-ltm-back-label','el-ltm-back-label2']
+  },
+  overload: {
+    title: 'Объркани след обяснението',
+    body: 'Учителят е обяснил добре — поне му се е сторило. Учениците са слушали. Но когато дойде ред на самостоятелна работа — объркване. Причината: работната памет е претоварена. Твърде много нова информация наведнъж, без връзка с предишни знания, без малки стъпки.',
+    chain: [
+      {label:'Слаби предишни знания', cls:'chain-teal'},
+      {label:'+', cls:'chain-arrow'},
+      {label:'Задача без стъпки', cls:'chain-amber'},
+      {label:'→', cls:'chain-arrow'},
+      {label:'Работна памет претоварена', cls:'chain-red'},
+      {label:'→', cls:'chain-arrow'},
+      {label:'Ученето спира', cls:'chain-red'},
+    ],
+    lit: ['el-inner-prior','el-ctx-arr3','el-env-task','el-task-arrow','el-student','el-attention','el-arr-sa','el-wm','el-arr-aw','el-teacher'],
+    dim: ['el-env-space','el-env-social','el-env-family','el-teacher-arrow','el-inner-safe','el-inner-efficacy','el-inner-state','el-inner-motivation','el-ctx-arr1','el-ctx-arr2','el-ctx-arr4','el-ctx-arr5','el-ltm','el-arr-wl','el-practice','el-forgetting','el-forget-loop','el-forget-label','el-forget-label2','el-arr-lp','el-ltm-back','el-ltm-back-label','el-ltm-back-label2']
+  },
+  transfer: {
+    title: 'Знаят, но не прилагат',
+    body: 'Учениците могат да възпроизведат определението, да решат стандартна задача — но когато контекстът се промени малко, се блокират. Трансферът не работи. Причината: знанието е съхранено декларативно, но не е достатъчно дълбоко обработено чрез различни контексти, сравнения и приложение.',
+    chain: [
+      {label:'Дългосрочна памет (повърхностна схема)', cls:'chain-purple'},
+      {label:'→', cls:'chain-arrow'},
+      {label:'Упражняване без вариация', cls:'chain-amber'},
+      {label:'→', cls:'chain-arrow'},
+      {label:'Без условно знание', cls:'chain-amber'},
+      {label:'→', cls:'chain-arrow'},
+      {label:'Трансферът не работи', cls:'chain-red'},
+    ],
+    lit: ['el-ltm','el-arr-lp','el-practice','el-forgetting','el-forget-loop','el-forget-label','el-forget-label2','el-ltm-back','el-ltm-back-label','el-ltm-back-label2','el-env-task','el-teacher'],
+    dim: ['el-env-space','el-env-social','el-env-family','el-task-arrow','el-teacher-arrow','el-inner-safe','el-inner-efficacy','el-inner-prior','el-inner-state','el-inner-motivation','el-ctx-arr1','el-ctx-arr2','el-ctx-arr3','el-ctx-arr4','el-ctx-arr5','el-attention','el-arr-sa','el-wm','el-arr-aw','el-arr-wl']
+  }
+};
+
+const nodes = {
+  'env-space':{ title:'Физическа среда', body:'Прекомерно наредените или декорирани стаи отклоняват вниманието. Шумът и акустичният хаос увеличават когнитивния товар преди задачата да е започнала.', q:'Погледни стаята, в която преподаваш. Кое в нея отклонява вниманието на учениците, освен теб?', tags:['context'] },
+  'env-social':{ title:'Социална среда', body:'Мозъкът обработва социалното изключване в същите региони, в които обработва физическата болка. Принадлежността не е просто добра атмосфера — тя е предпоставка за учене.', q:'Има ли ученик, за когото не знаеш дали се чувства приет от групата?', tags:['context'] },
+  'env-task':{ title:'Задачата и видовете знание', body:'Не всичко се учи по един начин. Декларативното знание (факти) изисква различен дизайн от процедурното (умения) и условното (кога и защо да приложиш кое).\n\nФакти и умения са неразделни — критичното мислене зависи от предметно знание.', q:'В последния ти урок — какъв вид знание преподаваше? Беше ли дизайнът подходящ?', action:'Провери: задачата изисква ли реално мислене, или само следване на процедура? Ако е само процедура — добави елемент на сравнение, обяснение или приложение в нов контекст.', tags:['knowledge','teacher'] },
+  'teacher-node':{ title:'Учителят като проектант', body:'Учителят влияе на всяка точка от картата: проектира средата, избира задачата, управлява вниманието, дозира товара, дава обратна връзка, планира практиката. Не е предавател на информация — той е архитект на условията.', q:'За кое от тези действия се чувстваш най-уверен? За кое — най-несигурен?', action:'Избери едно действие, върху което да работиш съзнателно следващата седмица. Не повече от едно.', tags:['teacher'] },
+  'env-family':{ title:'Семейство и житейски опит', body:'Ученето се надгражда върху съществуващ опит. Семейният контекст и предишните учебни преживявания оформят схемите, с които ученикът влиза в класната стая.', q:'Какво знаеш за семейния контекст на учениците? Как влияе той на отношението им към предмета?', tags:['context'] },
+  'inner-safe':{ title:'Психологическа безопасност', body:'Когато ученикът се чувства застрашен, амигдалата се активира и физически блокира пътя към префронталния кортекс. Ученето е биологично невъзможно в страх.', q:'Как разбираш кога ученик се чувства несигурен? По какво невербално го забелязваш?', action:'Провери дали грешките в часа се третират като информация или като провал. Ако учениците се страхуват да сгрешат — безопасността е проблемът, не мотивацията.', tags:['context'] },
+  'inner-efficacy':{ title:'Самоефикасност', body:'Вярата, че можеш да успееш, е различна от реалните умения. Ученик с ниска самоефикасност избягва предизвикателства дори когато е способен. Оптималното учене е при ~80% успеваемост.', q:'Имаш ли ученик, който явно може, но не опитва? Какво мислиш, че стои зад това?', action:'Намали нивото на задачата временно така, че ученикът да преживее успех. После постепенно увеличи трудността. Самоефикасността се гради от преживян успех, не от окуражаване.', tags:['context'] },
+  'inner-prior':{ title:'Предишни знания', body:'Мозъкът не започва от нула. Новото знание се свързва с вече съществуващи схеми. Без активиране на предишни знания информацията "лебди" без котва. Важно: предишните знания могат да включват погрешни представи, които трябва да се адресират.', q:'Как активираш предишните знания? Проверяваш ли дали са верни, или само дали съществуват?', action:'Преди да въведеш нов материал — задай въпрос, който изважда на повърхността какво знаят учениците. Погрешните представи са по-опасни от незнанието.', tags:['context','mech'] },
+  'inner-state':{ title:'Физическо и емоционално състояние', body:'Сън, хидратация и базово физическо благополучие са биологични условия за работната памет. Уморен ученик разполага буквално с по-малко когнитивен ресурс.', q:'Кога последно си забелязал, че физическото състояние видимо влияе на урока?', tags:['context'] },
+  'inner-motivation':{ title:'Смисъл и мотивация', body:'Допаминът е свързан с предвиждането на успех. Когато ученикът вижда защо нещо има значение лично за него, мозъкът инвестира внимание. Без смисъл информацията се филтрира преди да е влязла в работната памет.', q:'За последния ти урок — смисълът на задачата беше ли ясен за учениците, или само за теб?', action:'Добави едно изречение в началото на урока, което свързва темата с нещо, което учениците вече имат причина да ги е грижа. Не общо "ще ви е нужно" — конкретно и лично.', tags:['context'] },
+  'student-center':{ title:'Ученикът, изправен пред задача', body:'Всяко учене започва от срещата между ученик и задача. Ученикът не е чист лист — идва с история: предишни знания и погрешни разбирания, емоционални асоциации, вяра или неверие в собствените си способности.', q:'Знаеш ли кой ученик идва с най-много погрешни разбирания по предстоящата тема? Имаш ли план за тях?', tags:['context','knowledge'] },
+  'cog-attention':{ title:'Внимание — входната точка', body:'Информация, която не е забелязана, не достига до работната памет. Вниманието е ограничено и лесно отклонимо.\n\nВнимание ≠ интерес. Нещо може да привлече вниманието, но да насочи мисленето към нерелевантното.', q:'Вниманието на учениците беше ли насочено към правилното нещо, или беше "включено", но грешно насочено?', action:'Провери: в най-активната дейност на последния ти урок — за какво конкретно мислеха учениците? Ако не можеш да отговориш — там е проблемът.', tags:['mech'] },
+  'cog-wm':{ title:'Работна памет — тясното гърло', body:'Работната памет обработва ~4–7 нови елемента едновременно. Три вида товар:\n• Вътрешен — сложността на темата (може да се раздроби)\n• Излишен — лош дизайн, неясни инструкции (трябва да се елиминира)\n• Полезен — усилието за разбиране (трябва да се насърчи)', q:'Дал ли си някога пет инструкции наведнъж? Какво се е случило след това?', action:'Раздроби следващото обяснение на части — представи едната, накарай учениците да я приложат, после мини към следващата. Не давай цялото преди практиката.', tags:['mech'] },
+  'cog-ltm':{ title:'Дългосрочна памет — целта', body:'Учене = трайна промяна в дългосрочната памет. Ако нищо не е променено там, нищо не е научено. Знанието се съхранява като схеми. Дългосрочната памет влияе обратно на работната — автоматизираното знание освобождава ресурс.', q:'Как разбираш, че нещо е влязло в дългосрочната памет — а не само е "разбрано" в часа?', action:'Следващия час започни с 3-минутно свободно извличане — учениците пишат всичко, което помнят от предишния час, без бележки. После проверяват. Това е единственият начин да разбереш какво реално е останало.', tags:['mech'] },
+  'cog-practice':{ title:'Упражняване — трайното учене', body:'Шест стратегии с доказана ефективност:\n• Извличане — активно припомняне без подсказки\n• Разпределена практика — на интервали от време\n• Редуване — смесване на различни типове задачи\n• Двойно кодиране — думи и смислени визуали\n• Обогатяване — свързване с личен контекст\n• Конкретни примери — за намиране на дълбоката структура', q:'Коя от тези стратегии използваш редовно? Коя никога не си пробвал?', action:'Планирай кога учениците ще се върнат към днешния материал — не утре, а след 3-4 дни. Едно кратко извличане (5 мин) без подсказки е по-ефективно от час преговор с отворени книги.', tags:['mech','teacher'] },
+  'cog-forgetting':{ title:'Забравянето — механизъм, не провал', body:'Мозъкът активно изтрива неизползвана информация. Именно затова активното извличане и разпределената практика работят — те принуждават мозъка да укрепи паметта всеки път наново.', q:'Планираш ли кога учениците ще се върнат към нещо научено, или разчиташ това да се случи случайно?', action:'Добави "входен билет" в началото на следващия час — едно питане по миналия материал без подсказки. Забравянето не е проблем, когато е планирано.', tags:['mech','teacher'] }
+};
+
+const principles = [
+  { text:'Паметта е отпечатък на мисълта', source:'Willingham, 2009', detail:'Не какво правят учениците, а за какво мислят. Активност не е учене.' },
+  { text:'Учене = трайна промяна, не покрито съдържание', source:'Willingham · Deans for Impact', detail:'Ако нищо не е променено в дългосрочната памет, нищо не е научено. Трансферът е единственият истински тест.' },
+  { text:'Факти и умения са неразделни', source:'Willingham, гл. 2', detail:'Критичното мислене зависи от предметно знание. Работната памет няма с какво да работи без фактическа база.' },
+  { text:'Новакът се нуждае от структура, не от откритие', source:'Sweller · Rosenshine, 2012', detail:'Начинаещият ученик се нуждае от явно моделиране, малки стъпки и временна подкрепа.' },
+  { text:'Забравянето е двигател на ученето', source:'Ebbinghaus · Roediger & Butler, 2011', detail:'Мозъкът изтрива неизползвана информация. Извличането при усилие укрепва паметта по-здраво от повторението.' },
+  { text:'Учителят проектира условия, не предава знание', source:'OECD · Rosenshine, 2012', detail:'Централната роля е да проектира средата така, че когнитивните механизми да работят в полза на учениците.' }
+];
+
+let activeScenario = null;
+
+function applyScenario(key) {
+  const sc = scenarios[key];
+  if (!sc) return;
+  activeScenario = key;
+
+  // Update buttons
+  document.querySelectorAll('.sc-btn').forEach(b => b.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+  document.getElementById('sc-reset').style.display = 'inline-block';
+
+  // All elements: first reset
+  document.querySelectorAll('.map-el').forEach(el => {
+    el.classList.remove('lit','dimmed','ctx-default');
+  });
+
+  // Apply lit
+  sc.lit.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.classList.add('lit'); el.style.pointerEvents = 'auto'; }
+  });
+
+  // Apply dim
+  sc.dim.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.add('dimmed');
+  });
+
+  // Explanation
+  document.getElementById('sc-exp-title').textContent = sc.title;
+  document.getElementById('sc-exp-body').textContent = sc.body;
+  const chainEl = document.getElementById('sc-exp-chain');
+  chainEl.innerHTML = sc.chain.map(c =>
+    c.cls === 'chain-arrow'
+      ? `<span class="chain-arrow">${c.label}</span>`
+      : `<span class="sc-chain-item ${c.cls}">${c.label}</span>`
+  ).join('');
+  document.getElementById('sc-explanation').classList.add('visible');
+
+  // Close detail panel
+  document.getElementById('detail-panel').classList.remove('visible');
+}
+
+function resetScenario() {
+  activeScenario = null;
+  document.querySelectorAll('.sc-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('sc-reset').style.display = 'none';
+  document.getElementById('sc-explanation').classList.remove('visible');
+  document.querySelectorAll('.map-el').forEach(el => {
+    el.classList.remove('lit','dimmed');
+    if (!el.classList.contains('flow-node') && !el.classList.contains('flow-line')) {
+      el.classList.add('ctx-default');
+    }
+  });
+  document.getElementById('detail-panel').classList.remove('visible');
+}
+
+function handleClick(el, id) {
+  show(id);
+}
+
+function show(id) {
+  const node = nodes[id];
+  if (!node) return;
+  document.getElementById('panel-title').textContent = node.title;
+  document.getElementById('panel-body').innerHTML = node.body.replace(/\n/g,'<br>');
+  const aEl = document.getElementById('panel-action');
+  if (node.action && activeScenario) { aEl.textContent = node.action; aEl.style.display='block'; }
+  else { aEl.style.display='none'; }
+  const qEl = document.getElementById('panel-q');
+  if (node.q) { qEl.textContent = node.q; qEl.style.display='block'; } else { qEl.style.display='none'; }
+  const tagMap = { context:['context','Контекст'], mech:['mech','Механизъм'], teacher:['teacher','Учител'], knowledge:['knowledge','Знание'] };
+  document.getElementById('panel-tags').innerHTML = (node.tags||[]).map(t => {
+    const [cls,label] = tagMap[t]||['context',t];
+    return `<span class="panel-tag tag-${cls}">${label}</span>`;
+  }).join('');
+  document.getElementById('detail-panel').classList.add('visible');
+  document.getElementById('detail-panel').scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+
+function closePanel() { document.getElementById('detail-panel').classList.remove('visible'); }
+
+const grid = document.getElementById('principles-grid');
+principles.forEach((p,i) => {
+  const card = document.createElement('div');
+  card.className = 'principle-card';
+  card.innerHTML = `<div class="principle-text">${p.text}</div><div class="principle-source">${p.source}</div><div class="principle-expand" id="pexp-${i}">${p.detail}</div>`;
+  card.onclick = () => document.getElementById('pexp-'+i).classList.toggle('open');
+  grid.appendChild(card);
+});
+</script>
+</div>
